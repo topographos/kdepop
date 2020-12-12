@@ -1,0 +1,64 @@
+---
+title: "KDE for Population Modelling"
+author: "Michal Michalski"
+date: "12/12/2020"
+output: 
+  html_document:
+    theme: flatly
+    highlight: tango
+    code_download: true
+    toc: true
+    toc_float: 
+      collapsed: true
+      smooth_scroll: false
+  
+---
+<style>
+div.blue { background-color:#D3D3D3; border-radius: 5px; padding: 20px;}
+</style>
+<div class = "blue">
+Notes on using Kernel Density Estimation for modelling population density
+</div>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages
+First, I am loading all packages necessary for the following analysis.
+```{r packages, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+library(raster)# deal with raster
+library(sf) # spatial class
+library(mapview) # interactive map viewing
+library(tmap) # cartography
+library(tmaptools) # little helpers
+library(smoothr) # smooth contours
+library(dplyr) # manipulate
+
+```
+
+
+## Finally, session info
+```{r}
+sessionInfo()
+```
+
+
+&nbsp;
+<hr />
+<p style="text-align: center;">A work by <a href="https://github.com/topographos/">Michal Michalski</a></p>
+<p style="text-align: center;"><span style="color: #808080;"><em>michal.m.michalski@durham.ac.uk</em></span></p>
+
+<!-- Add icon library -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+<!-- Add font awesome icons -->
+<p style="text-align: center;">
+    <a href="https://twitter.com/topographos2" class="fa fa-twitter"></a>
+    <a href="https://topographos.rbind.io/" class="fa fa-globe"></a>
+    <a href="https://github.com/topographos/" class="fa fa-github"></a>
+</p>
+
+&nbsp;
