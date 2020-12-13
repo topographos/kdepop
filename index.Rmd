@@ -1,7 +1,7 @@
 ---
 title: "KDE for Population Modelling"
 author: "Michal Michalski"
-date: "12/12/2020"
+date: "14/12/2020"
 output: 
   html_document:
     theme: flatly
@@ -34,13 +34,243 @@ library(sf) # spatial class
 library(mapview) # interactive map viewing
 library(tmap) # cartography
 library(tmaptools) # little helpers
-library(smoothr) # smooth contours
 library(dplyr) # manipulate
+library(esri2sf) # get data from the server
+library(spatstat) # spatial statistics
+library(sp) 
+library(rgdal)
+library(maptools)
+library(spex)
+```
+
+## Data
+
+Data Zones Centroids
+```{r}
+
+url_dz =  "http://sedsh127.sedsh.gov.uk/arcgis/rest/services/ScotGov/StatisticalUnits/MapServer/4"
+
+dz_cntr = esri2sf(url_dz, outFields=c("TotPop2011")) %>% st_transform(27700)
+
+plot(dz_cntr)
 
 ```
 
 
+NHS Health Boards bounadaries - above method does not work for polygons in this situation
+```{r}
+
+hb_pol = st_read("data/SG_NHS_HealthBoards_2019.shp")
+
+plot(hb_pol)
+
+```
+
+## Area of Interest
+
+Here I will select NHS Lothian Health Board and clip the Data Zones centroids to its boundaries
+
+### Filter
+```{r}
+
+hb_lothian = hb_pol %>% 
+  filter(HBName == "Lothian") %>% 
+  select(-Shape_Leng, -Shape_Area)
+
+plot(hb_lothian)
+
+```
+
+### Subset
+
+```{r}
+
+dz_lothian = dz_cntr[hb_lothian,]
+
+plot(dz_lothian)
+
+```
+## Binning 
+
+### GRID
+
+```{r}
+rec_grid = st_make_grid(dz_lothian, cellsize = 500, square = TRUE)
+
+rec_grid_sf = st_sf(rec_grid)
+
+rec_grid_sf <- rec_grid_sf %>% mutate(id = row_number())
+
+rec_grid_join = st_join(rec_grid_sf, dz_lothian)
+
+rec_grid_sum = rec_grid_join %>%
+  group_by(id) %>%
+  summarize(
+    dz_count = n(),
+    pop_sum  = sum(TotPop2011)
+  ) %>% 
+  filter(!is.na(pop_sum))
+```
+
+Map
+
+```{r}
+
+tmap_mode(mode = c("view"))
+
+tm_shape(rec_grid_sum) +
+  tm_fill(col = "pop_sum",
+          style = "jenks",
+          convert2density = TRUE) + 
+  tm_borders(alpha=.8, col = "white")
+```
+
+<div class = "blue">
+ESRI - Point Density (SPatial Analyst) - focal operation with movable window e.g.
+1 point / (9 cells * 100m2 area per cell) = 0.0011 points per square meter (within a 3x3 search window)
+
+https://pro.arcgis.com/en/pro-app/tool-reference/spatial-analyst/point-density.htm
+</div>
+
+## Kernel Density Estimation
+
+### Definition
+
+**Kernel Density Estimation (KDE)** - method of analyzing the first-order of intensity of point pattern
+
+* the kernel
+* the bandwidth
+* the edge effect
+
+https://mathisonian.github.io/kde/
+
+
+### Library(spatstat)
+
+Convert sf class to ppp class - DZ Centroids
+
+```{r}
+
+dz_lothian.sp <- as_Spatial(dz_lothian)
+
+class(dz_lothian.sp)
+
+dz_lothian.ppp <- as(dz_lothian.sp, "ppp")
+
+class(dz_lothian.ppp)
+
+
+```
+
+
+Convert sf class to ppp class - HB Boundaries
+
+```{r}
+
+hb_lothian.sp <- as_Spatial(hb_lothian)
+
+class(hb_lothian.sp)
+
+hb_lothian.ppp <- as(hb_lothian.sp, "owin")
+
+class(hb_lothian.ppp)
+
+
+```
+
+Plot the Point Pattern for Analysis
+
+```{r}
+
+# assign boundaries to dz ppp
+
+Window(dz_lothian.ppp) <- hb_lothian.ppp
+
+# plot
+plot(dz_lothian.ppp, main=NULL, cols=rgb(0,0,0,.2), pch=20)
+
+```
+
+
+Create KDE
+
+```{r}
+
+kde_200 = density(dz_lothian.ppp, 
+        sigma=200, # choose bandwith / diameter of the Kernel in the units your map is in
+        eps = 100, # pixel resolution
+        weights= dz_lothian.ppp$marks, # population 
+        edge=TRUE, 
+        varcov=NULL,
+        at="pixels",
+        eaveoneout=TRUE,
+        adjust=1, 
+        diggle=FALSE, 
+        se=FALSE,
+        kernel="gaussian", # choose kernel
+        scalekernel=is.character(kernel), 
+        positive=FALSE,
+        verbose=TRUE)
+
+kde_500 = density(dz_lothian.ppp, 
+        sigma=500, # choose bandwith / diameter of the Kernel in the units your map is in
+        eps = 100, # pixel resolution
+        weights= dz_lothian.ppp$marks, # population
+        edge=TRUE, 
+        varcov=NULL,
+        at="pixels",
+        eaveoneout=TRUE,
+        adjust=1, 
+        diggle=FALSE, 
+        se=FALSE,
+        kernel="gaussian", # choose kernel
+        scalekernel=is.character(kernel), 
+        positive=FALSE,
+        verbose=TRUE)
+
+```
+
+Plot KDE
+
+
+```{r}
+
+plot(kde_200, main = "Sigma 200m")
+plot(kde_500, main = "Sigma 500m")
+
+```
+
+<div class = "blue">
+ESRI - Kernel Density (Spatial Analyst)
+
+https://pro.arcgis.com/en/pro-app/tool-reference/spatial-analyst/kernel-density.htm
+
+</div>
+
+### Extract Clusters
+
+```{r}
+
+kde_raster = raster(kde_500)
+
+kde_pol = spex::polygonize(kde_raster)
+
+kde_pol2 = kde_pol %>% 
+   filter(layer > 0.001) %>% # DEFINE THRESHOLD
+   summarize()
+
+plot(kde_pol2)
+```
+
+<div class = "blue">
+ESRI - Raster to Polygon (Conversion)
+
+https://pro.arcgis.com/en/pro-app/tool-reference/conversion/raster-to-polygon.htm
+
+</div>
+
 ## Finally, session info
+
 ```{r}
 sessionInfo()
 ```
@@ -49,16 +279,4 @@ sessionInfo()
 &nbsp;
 <hr />
 <p style="text-align: center;">A work by <a href="https://github.com/topographos/">Michal Michalski</a></p>
-<p style="text-align: center;"><span style="color: #808080;"><em>michal.m.michalski@durham.ac.uk</em></span></p>
-
-<!-- Add icon library -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-
-<!-- Add font awesome icons -->
-<p style="text-align: center;">
-    <a href="https://twitter.com/topographos2" class="fa fa-twitter"></a>
-    <a href="https://topographos.rbind.io/" class="fa fa-globe"></a>
-    <a href="https://github.com/topographos/" class="fa fa-github"></a>
-</p>
-
 &nbsp;
