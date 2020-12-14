@@ -261,6 +261,8 @@ kde_pol2 = kde_pol %>%
 
 kde_pol2 = kde_pol2 %>% st_set_crs(27700)
 
+plot(kde_pol2)
+
 ```
 
 <div class = "blue">
