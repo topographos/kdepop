@@ -257,9 +257,10 @@ kde_pol = spex::polygonize(kde_raster)
 
 kde_pol2 = kde_pol %>% 
    filter(layer > 0.001) %>% # DEFINE THRESHOLD
-   summarize()
+   summarize() 
 
-plot(kde_pol2)
+kde_pol2 = kde_pol2 %>% st_set_crs(27700)
+
 ```
 
 <div class = "blue">
@@ -268,6 +269,34 @@ ESRI - Raster to Polygon (Conversion)
 https://pro.arcgis.com/en/pro-app/tool-reference/conversion/raster-to-polygon.htm
 
 </div>
+
+## Settlements
+
+```{r}
+
+# settlements
+sett_url =  "http://sedsh127.sedsh.gov.uk/arcgis/rest/services/NRS/NRS/MapServer/9"
+
+sett_pol = esri2sf(sett_url, outFields=c("name")) %>% st_transform(27700)
+
+sett_lothian = sett_pol[hb_lothian,]
+
+```
+
+Map
+
+```{r}
+
+tmap_mode(mode = c("view"))
+
+tm_shape(kde_pol2) +
+  tm_fill(col = "red", alpha = 0.5) +
+tm_shape(sett_lothian) +
+  tm_fill(col = "blue", alpha = 0.5)
+  
+```
+
+
 
 ## Finally, session info
 
