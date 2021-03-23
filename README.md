@@ -1,2 +1,2 @@
-# kdepop
-Notebook on Kernel Density Estimation
+# KDE for population clusters
+Scratchbook on Kernel Density Estimation
